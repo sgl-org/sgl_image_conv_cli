@@ -7,7 +7,7 @@ SGLToolKit「图片转换」功能（`src/components/ImageConvert.vue`）的 C �
 与 Web 版 `ImageConvert` 页面对齐：
 
 - **输入格式**：PNG / JPEG / BMP（通过内置 `stb_image.h` 解码，无外部依赖）
-- **颜色格式**：`RGB888`、`RGB565`、`RGB332`、`ARGB8888`、`ARGB4444`、`ARGB2222`
+- **颜色格式**：`RGB888`、`RGB565`、`RGB332`、`ARGB8888`、`ARGB8565`、`ARGB4444`、`ARGB2222`
 - **输出格式**：`.c` 源文件 或 `.bin` 二进制文件
 - **压缩算法**：无压缩 / RLE / QOI（仅 RGB565，字节格式与 SGL 解码器一致）
 - **透明填充**：半透明像素按 alpha 与指定颜色混合（同 Web 端逻辑）
@@ -30,7 +30,7 @@ Windows (MinGW) / Linux / macOS 通用，仅需 C99 编译器。
 image_conv <图片...> [选项]
 
 选项:
-  -f, --format <fmt>        颜色格式: RGB888|RGB565|RGB332|ARGB8888|ARGB4444|ARGB2222 (默认 RGB888)
+  -f, --format <fmt>        颜色格式: RGB888|RGB565|RGB332|ARGB8888|ARGB8565|ARGB4444|ARGB2222 (默认 RGB888)
   -o, --output <fmt>        输出格式: c|bin (默认 c)
   -c, --compression <alg>   压缩算法: none|rle|qoi (默认 none, qoi 仅 RGB565)
   -t, --transparent <#RRGGBB>

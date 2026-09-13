@@ -6,7 +6,7 @@
  *
  * Supported features:
  *   - Input formats : PNG / JPEG / BMP (via stb_image)
- *   - Color formats : RGB888, RGB565, RGB332, ARGB8888, ARGB4444, ARGB2222
+ *   - Color formats : RGB888, RGB565, RGB332, ARGB8888, ARGB8565, ARGB4444, ARGB2222
  *   - Output        : .c source file or .bin binary file
  *   - Compression   : none / RLE / QOI (RGB565 only)
  *   - Transparent fill (alpha blend with a fixed color)
@@ -96,7 +96,7 @@ static void print_usage(const char *prog)
 "用法: %s <图片...> [选项]\n"
 "\n"
 "选项:\n"
-"  -f, --format <fmt>        颜色格式: RGB888|RGB565|RGB332|ARGB8888|ARGB4444|ARGB2222 (默认 RGB888)\n"
+"  -f, --format <fmt>        颜色格式: RGB888|RGB565|RGB332|ARGB8888|ARGB8565|ARGB4444|ARGB2222 (默认 RGB888)\n"
 "  -O, --out <fmt>           输出格式: c|bin (默认 c)\n"
 "  -c, --compression <alg>   压缩算法: none|rle|qoi (默认 none, qoi 仅 RGB565)\n"
 "  -t, --transparent <#RRGGBB>\n"
@@ -125,6 +125,7 @@ static int parse_color_format(const char *value, color_format_t *out)
     if (strcmp(value, "RGB565") == 0)   { *out = FMT_RGB565;   return 1; }
     if (strcmp(value, "RGB332") == 0)   { *out = FMT_RGB332;   return 1; }
     if (strcmp(value, "ARGB8888") == 0) { *out = FMT_ARGB8888; return 1; }
+    if (strcmp(value, "ARGB8565") == 0) { *out = FMT_ARGB8565; return 1; }
     if (strcmp(value, "ARGB4444") == 0) { *out = FMT_ARGB4444; return 1; }
     if (strcmp(value, "ARGB2222") == 0) { *out = FMT_ARGB2222; return 1; }
     return 0;

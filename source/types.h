@@ -10,6 +10,7 @@ typedef enum {
     FMT_RGB565,
     FMT_RGB332,
     FMT_ARGB8888,
+    FMT_ARGB8565,
     FMT_ARGB4444,
     FMT_ARGB2222,
     FMT_COUNT

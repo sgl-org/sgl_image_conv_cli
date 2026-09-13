@@ -69,6 +69,15 @@ uint8_t *bitmap_encode_rgba(const uint8_t *rgba, size_t pixel_count,
             out[dst++] = (uint8_t)red;
             out[dst++] = (uint8_t)alpha;
             break;
+        case FMT_ARGB8565: {
+            unsigned value = (unsigned)(round_half_up(red / 255.0 * 31.0) << 11)
+                           | (unsigned)(round_half_up(green / 255.0 * 63.0) << 5)
+                           | (unsigned) round_half_up(blue / 255.0 * 31.0);
+            out[dst++] = (uint8_t)(value & 0xFF);
+            out[dst++] = (uint8_t)((value >> 8) & 0xFF);
+            out[dst++] = (uint8_t)alpha;
+            break;
+        }
         case FMT_ARGB4444: {
             unsigned value = (unsigned)(round_half_up(alpha / 255.0 * 15.0) << 12)
                            | (unsigned)(round_half_up(red / 255.0 * 15.0) << 8)
@@ -129,6 +138,14 @@ void bitmap_decode_pixel(const uint8_t *source, size_t offset,
         red   = source[offset + 2];
         alpha = source[offset + 3];
         break;
+    case FMT_ARGB8565: {
+        unsigned value = (unsigned)source[offset] | ((unsigned)source[offset + 1] << 8);
+        red   = ((value >> 11) & 0x1F) << 3;
+        green = ((value >> 5) & 0x3F) << 2;
+        blue  = (value & 0x1F) << 3;
+        alpha = source[offset + 2];
+        break;
+    }
     case FMT_ARGB4444: {
         unsigned value = (unsigned)source[offset] | ((unsigned)source[offset + 1] << 8);
         alpha = ((value >> 12) & 0x0F) << 4;
