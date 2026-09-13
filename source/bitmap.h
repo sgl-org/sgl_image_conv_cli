@@ -15,11 +15,16 @@
 uint8_t *bitmap_encode_rgba(const uint8_t *rgba, size_t pixel_count,
                             const conv_settings_t *settings, size_t *out_size);
 
-/* Resample an RGBA8888 image with bilinear interpolation (pixel-center
- * alignment). Returns a malloc'd dst_w * dst_h * 4 buffer, or NULL on
- * failure. Caller must free(). */
-uint8_t *bitmap_resample_rgba_bilinear(const uint8_t *src, int src_w, int src_h,
-                                       int dst_w, int dst_h);
+/* Resample an RGBA8888 image.
+ * For large downscale ratios a single bilinear pass samples only 2x2 source
+ * pixels and loses most detail (aliasing). This uses a two-stage pipeline:
+ *   1. progressive area-average (box) halving until within 2x of the target,
+ *      in premultiplied alpha to avoid transparent-edge fringes;
+ *   2. a Lanczos3 final pass to the exact target size.
+ * Upscales use Lanczos3 directly. Returns a malloc'd dst_w * dst_h * 4
+ * buffer, or NULL on failure. Caller must free(). */
+uint8_t *bitmap_resample_rgba(const uint8_t *src, int src_w, int src_h,
+                              int dst_w, int dst_h);
 
 /* Decode a single pixel of the native bitmap format back to RGBA.
  * (Used for the converted-image preview.) */

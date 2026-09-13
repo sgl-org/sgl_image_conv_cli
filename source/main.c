@@ -251,10 +251,12 @@ static int convert_single(const input_image_t *img, const conv_settings_t *setti
     }
 
     /* The web UI resizes via canvas drawImage when the user overrides
-     * width/height. Use bilinear resampling here to match its quality. */
+     * width/height. Use the two-stage pipeline (box halving + Lanczos3)
+     * here: a single bilinear pass loses most detail on large downscale
+     * ratios (e.g. 4096x4096 -> 200x200). */
     if (w != target_w || h != target_h) {
-        uint8_t *resized = bitmap_resample_rgba_bilinear(rgba, w, h,
-                                                         target_w, target_h);
+        uint8_t *resized = bitmap_resample_rgba(rgba, w, h,
+                                                target_w, target_h);
         if (resized == NULL) {
             snprintf(err, err_size, "缩放内存分配失败: %.200s", img->path);
             stbi_image_free(rgba);
