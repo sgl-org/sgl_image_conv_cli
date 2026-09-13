@@ -12,7 +12,7 @@ endif
 
 CFLAGS  = -O2 -Wall -std=c99
 LDFLAGS = -lm
-TARGET  = image_conv
+TARGET  = sgl_image_conv
 
 SRCS = main.c types.c util.c bitmap.c compress.c output.c
 OBJS = $(SRCS:.c=.o)
