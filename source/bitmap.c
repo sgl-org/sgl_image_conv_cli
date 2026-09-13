@@ -19,8 +19,10 @@ static int round_half_up(double v)
  * Resampling pipeline (see bitmap.h)
  * ------------------------------------------------------------------ */
 
-/* Area-average (box) resample for downscaling. Output is premultiplied
- * alpha so transparent pixels do not bleed their RGB into edges. */
+/* Area-average (box) resample for downscaling. Input and output are
+ * straight (non-premultiplied) RGBA. Averaging happens in premultiplied
+ * space so fully/partially transparent pixels do not bleed their RGB into
+ * edges; the result is unpremultiplied before it is stored. */
 static uint8_t *box_resample_rgba_pm(const uint8_t *src, int sw, int sh,
                                      int dw, int dh)
 {
@@ -60,26 +62,37 @@ static uint8_t *box_resample_rgba_pm(const uint8_t *src, int sw, int sh,
                     for (xx = ix0; xx < ix1; xx++) {
                         double wx = ((double)xx + 1.0 < fx1) ? 1.0 : fx1 - (double)xx;
                         double w;
+                        double a;
                         if (xx < fx0) wx -= (fx0 - (double)xx);
                         if (wx <= 0.0) continue;
                         w = wx * wy;
-                        acc[0] += (double)row[xx * 4 + 0] * w;
-                        acc[1] += (double)row[xx * 4 + 1] * w;
-                        acc[2] += (double)row[xx * 4 + 2] * w;
-                        acc[3] += (double)row[xx * 4 + 3] * w;
+                        a = (double)row[xx * 4 + 3] * w;
+                        /* premultiply RGB by alpha before accumulating */
+                        acc[0] += (double)row[xx * 4 + 0] * a;
+                        acc[1] += (double)row[xx * 4 + 1] * a;
+                        acc[2] += (double)row[xx * 4 + 2] * a;
+                        acc[3] += a;
                         area += w;
                     }
                 }
             }
 
             out = dst + ((size_t)y * (size_t)dw + (size_t)x) * 4u;
-            if (area <= 0.0) {
+            if (area <= 0.0 || acc[3] <= 0.0) {
                 out[0] = out[1] = out[2] = out[3] = 0;
                 continue;
             }
-            for (c = 0; c < 4; c++) {
-                double v = acc[c] / area + 0.5;
-                out[c] = (uint8_t)((v > 255.0) ? 255.0 : v); /* premultiplied clamp */
+            /* acc[c] = sum(rgb_c * a * w), acc[3] = sum(a * w):
+             * acc[c] / acc[3] is the alpha-weighted mean color, i.e. the
+             * unpremultiplied result. No extra factor needed (both carry
+             * the same 0..255 alpha scale, which cancels out). */
+            for (c = 0; c < 3; c++) {
+                double v = acc[c] / acc[3] + 0.5;
+                out[c] = (uint8_t)((v > 255.0) ? 255.0 : v);
+            }
+            {
+                double av = acc[3] / area + 0.5;
+                out[3] = (uint8_t)((av > 255.0) ? 255.0 : av);
             }
         }
     }
@@ -172,7 +185,11 @@ static resample_contrib_t *build_contribs(int src_len, int dst_len)
     return cs;
 }
 
-/* Lanczos3 resample of a premultiplied input; output is unpremultiplied. */
+/* Lanczos3 resample in straight alpha. Input and output are
+ * straight (non-premultiplied) RGBA. For opaque images the alpha channel
+ * is constant 255 and the RGB taps are the exact Lanczos result; for
+ * images with transparency the slight halo of straight-space filtering is
+ * acceptable and the pipeline stays symmetric with the box stage. */
 static uint8_t *lanczos_resample_pm(const uint8_t *src, int sw, int sh,
                                     int dw, int dh)
 {
@@ -216,7 +233,7 @@ static uint8_t *lanczos_resample_pm(const uint8_t *src, int sw, int sh,
         }
     }
 
-    /* Vertical pass: (dw, sh) -> (dw, dh), then unpremultiply. */
+    /* Vertical pass: (dw, sh) -> (dw, dh). Straight alpha in, straight out. */
     dst = (uint8_t *)malloc((size_t)dw * (size_t)dh * 4u);
     if (dst == NULL) {
         goto done;
@@ -226,7 +243,6 @@ static uint8_t *lanczos_resample_pm(const uint8_t *src, int sw, int sh,
         const resample_contrib_t *cc = &cy[y];
         for (x = 0; x < dw; x++) {
             double acc[4] = {0.0, 0.0, 0.0, 0.0};
-            double alpha;
             uint8_t *out;
 
             for (k = 0; k < cc->count; k++) {
@@ -240,15 +256,9 @@ static uint8_t *lanczos_resample_pm(const uint8_t *src, int sw, int sh,
             }
 
             out = dst + ((size_t)y * (size_t)dw + (size_t)x) * 4u;
-            alpha = acc[3];
-            if (alpha <= 0.5) {
-                out[0] = out[1] = out[2] = out[3] = 0;
-            } else {
-                for (c = 0; c < 3; c++) {
-                    double v = acc[c] * 255.0 / alpha + 0.5;
-                    out[c] = (uint8_t)((v > 255.0) ? 255.0 : v);
-                }
-                out[3] = (uint8_t)((alpha > 255.0) ? 255.0 : (alpha + 0.5));
+            for (c = 0; c < 4; c++) {
+                double v = acc[c] + 0.5;
+                out[c] = (uint8_t)((v > 255.0) ? 255.0 : (v < 0.0) ? 0.0 : v);
             }
         }
     }
@@ -277,7 +287,9 @@ uint8_t *bitmap_resample_rgba(const uint8_t *src, int src_w, int src_h,
     ch = src_h;
 
     /* Stage 1: area-average halving until within 2x of the target.
-     * Each pass sees every source pixel, so no detail is skipped. */
+     * Each pass sees every source pixel, so no detail is skipped.
+     * Averaging runs in premultiplied alpha to avoid transparent-edge
+     * fringes; the output is straight RGBA again. */
     while (cw > dst_w * 2 || ch > dst_h * 2) {
         int nw = cw / 2;
         int nh = ch / 2;
