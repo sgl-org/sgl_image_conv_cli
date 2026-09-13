@@ -15,6 +15,12 @@
 uint8_t *bitmap_encode_rgba(const uint8_t *rgba, size_t pixel_count,
                             const conv_settings_t *settings, size_t *out_size);
 
+/* Resample an RGBA8888 image with bilinear interpolation (pixel-center
+ * alignment). Returns a malloc'd dst_w * dst_h * 4 buffer, or NULL on
+ * failure. Caller must free(). */
+uint8_t *bitmap_resample_rgba_bilinear(const uint8_t *src, int src_w, int src_h,
+                                       int dst_w, int dst_h);
+
 /* Decode a single pixel of the native bitmap format back to RGBA.
  * (Used for the converted-image preview.) */
 void bitmap_decode_pixel(const uint8_t *source, size_t offset,

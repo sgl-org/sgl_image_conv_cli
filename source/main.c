@@ -251,30 +251,19 @@ static int convert_single(const input_image_t *img, const conv_settings_t *setti
     }
 
     /* The web UI resizes via canvas drawImage when the user overrides
-     * width/height. Here we only support native size loading: when the
-     * user set explicit dimensions that differ from the file, the image
-     * must be resampled. Use simple box sampling. */
+     * width/height. Use bilinear resampling here to match its quality. */
     if (w != target_w || h != target_h) {
-        uint8_t *resized = (uint8_t *)malloc((size_t)target_w * (size_t)target_h * 4u);
-        if (resized != NULL) {
-            int x, y, c;
-            for (y = 0; y < target_h; y++) {
-                int sy = (int)((double)y * (double)h / (double)target_h);
-                if (sy > h - 1) sy = h - 1;
-                for (x = 0; x < target_w; x++) {
-                    int sx = (int)((double)x * (double)w / (double)target_w);
-                    if (sx > w - 1) sx = w - 1;
-                    for (c = 0; c < 4; c++) {
-                        resized[((size_t)y * target_w + x) * 4u + c] =
-                            rgba[((size_t)sy * w + sx) * 4u + c];
-                    }
-                }
-            }
+        uint8_t *resized = bitmap_resample_rgba_bilinear(rgba, w, h,
+                                                         target_w, target_h);
+        if (resized == NULL) {
+            snprintf(err, err_size, "缩放内存分配失败: %.200s", img->path);
             stbi_image_free(rgba);
-            rgba = resized;
-            w = target_w;
-            h = target_h;
+            return -1;
         }
+        stbi_image_free(rgba);
+        rgba = resized;
+        w = target_w;
+        h = target_h;
     }
 
     encoded = bitmap_encode_rgba(rgba, (size_t)w * (size_t)h, settings,

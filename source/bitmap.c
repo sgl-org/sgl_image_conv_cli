@@ -11,6 +11,75 @@ static int round_half_up(double v)
     return (int)floor(v + 0.5);
 }
 
+uint8_t *bitmap_resample_rgba_bilinear(const uint8_t *src, int src_w, int src_h,
+                                       int dst_w, int dst_h)
+{
+    uint8_t *dst;
+    int x, y;
+
+    if (src == NULL || src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0) {
+        return NULL;
+    }
+
+    dst = (uint8_t *)malloc((size_t)dst_w * (size_t)dst_h * 4u);
+    if (dst == NULL) {
+        return NULL;
+    }
+
+    for (y = 0; y < dst_h; y++) {
+        /* Pixel-center alignment: maps target pixel centers back to source
+         * coordinates, symmetric for up- and downscaling. */
+        double sy = ((double)y + 0.5) * (double)src_h / (double)dst_h - 0.5;
+        int y0;
+        int y1;
+        double fy;
+
+        if (sy < 0.0) sy = 0.0;
+        if (sy > (double)(src_h - 1)) sy = (double)(src_h - 1);
+
+        y0 = (int)floor(sy);
+        if (y0 > src_h - 1) y0 = src_h - 1;
+        y1 = (y0 + 1 <= src_h - 1) ? y0 + 1 : src_h - 1;
+        fy = sy - (double)y0;
+
+        for (x = 0; x < dst_w; x++) {
+            double sx = ((double)x + 0.5) * (double)src_w / (double)dst_w - 0.5;
+            int x0;
+            int x1;
+            double fx;
+            const uint8_t *p00;
+            const uint8_t *p01;
+            const uint8_t *p10;
+            const uint8_t *p11;
+            uint8_t *out;
+            int c;
+
+            if (sx < 0.0) sx = 0.0;
+            if (sx > (double)(src_w - 1)) sx = (double)(src_w - 1);
+
+            x0 = (int)floor(sx);
+            if (x0 > src_w - 1) x0 = src_w - 1;
+            x1 = (x0 + 1 <= src_w - 1) ? x0 + 1 : src_w - 1;
+            fx = sx - (double)x0;
+
+            p00 = src + ((size_t)y0 * (size_t)src_w + (size_t)x0) * 4u;
+            p01 = src + ((size_t)y0 * (size_t)src_w + (size_t)x1) * 4u;
+            p10 = src + ((size_t)y1 * (size_t)src_w + (size_t)x0) * 4u;
+            p11 = src + ((size_t)y1 * (size_t)src_w + (size_t)x1) * 4u;
+            out = dst + ((size_t)y * (size_t)dst_w + (size_t)x) * 4u;
+
+            for (c = 0; c < 4; c++) {
+                double top    = (double)p00[c] * (1.0 - fx) + (double)p01[c] * fx;
+                double bottom = (double)p10[c] * (1.0 - fx) + (double)p11[c] * fx;
+                double value  = top * (1.0 - fy) + bottom * fy;
+                out[c] = (uint8_t)(value + 0.5);
+            }
+        }
+    }
+
+    return dst;
+}
+
 uint8_t *bitmap_encode_rgba(const uint8_t *rgba, size_t pixel_count,
                             const conv_settings_t *settings, size_t *out_size)
 {
